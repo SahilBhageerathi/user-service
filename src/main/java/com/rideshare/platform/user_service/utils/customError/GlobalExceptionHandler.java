@@ -31,6 +31,12 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.FORBIDDEN, "Access Denied: " + ex.getMessage(),null);
     }
 
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<Object> handleUserNotFound(UserNotFoundException ex) {
+        String errorMessage = "User not found: " + ex.getMessage();
+        return buildResponse(HttpStatus.NOT_FOUND, errorMessage, null);
+    }
+
 
     private ResponseEntity<Object> buildResponse(HttpStatus status, String message, List<String> details) {
         Map<String, Object> error = new HashMap<>();
@@ -53,7 +59,6 @@ public class GlobalExceptionHandler {
 
         return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-
 
 
 
