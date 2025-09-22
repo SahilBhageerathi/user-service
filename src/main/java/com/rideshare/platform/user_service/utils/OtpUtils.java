@@ -34,8 +34,8 @@ public class OtpUtils {
     @Value("${twilio.auth.token}")
     private String twilioAuthToken;
 
-    @Value("${twilio.phone.number}")
-    private String twilioPhoneNumber;
+    @Value("${twilio.from.number}")
+    private String twilioFromNumber;
 
 
     @PostConstruct
@@ -52,7 +52,7 @@ public class OtpUtils {
     public void sendSms(String toPhoneNumber, String message) {
         Message.creator(
                 new com.twilio.type.PhoneNumber(toPhoneNumber),
-                new com.twilio.type.PhoneNumber(twilioPhoneNumber),
+                new com.twilio.type.PhoneNumber(twilioFromNumber),
                 message
         ).create();
     }
