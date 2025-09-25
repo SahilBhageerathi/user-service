@@ -4,14 +4,18 @@ import com.rideshare.platform.user_service.dto.*;
 import com.rideshare.platform.user_service.entity.User;
 import com.rideshare.platform.user_service.repository.UserRepository;
 import com.rideshare.platform.user_service.service.UserService;
+import com.rideshare.platform.user_service.utils.JwtUtils;
 import com.rideshare.platform.user_service.utils.OtpUtils;
 import com.rideshare.platform.user_service.utils.customError.EmailAlreadyInUseException;
+import com.rideshare.platform.user_service.utils.customError.InvalidOtpException;
+import com.rideshare.platform.user_service.utils.customError.InvalidTokenException;
 import com.rideshare.platform.user_service.utils.customError.UserNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
 
+import io.jsonwebtoken.Claims;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import java.util.List;
 
 
 @Service
@@ -19,15 +23,15 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final OtpUtils otpUtils;
+    private final JwtUtils jwtUtils;
 
-    public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, OtpUtils otpUtils, JwtUtils jwtUtils) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.otpUtils = otpUtils;
+        this.jwtUtils = jwtUtils;
     }
-
-    @Autowired
-    private OtpUtils otpUtils;
-
 
     @Override
     public UserDto registerUser(UserRegistrationDto request) {
@@ -99,6 +103,83 @@ public class UserServiceImpl implements UserService {
         } catch (Exception e) {
             throw new UserNotFoundException("User not found with phone: " + request.getPhoneNumber());
         }
+    }
+
+    @Override
+    public UserVerifyOtpResponseDto verifyOTP(UserVerifyOtpRequestDto request) {
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        boolean isValid = otpUtils.verifyOTP(request.getUserId().toString(), request.getOtp());
+        if (!isValid) throw new InvalidOtpException("Invalid OTP");
+
+
+
+        String accessToken = jwtUtils.generateAccessToken(user);
+        String refreshToken = jwtUtils.generateRefreshToken(user);
+
+        user.setRefreshToken(refreshToken);
+        userRepository.save(user);
+
+
+        return UserVerifyOtpResponseDto.builder()
+                .message("Otp verified successfully")
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .name(user.getName())
+                .userId(user.getId().toString())
+                .email(user.getEmail())
+                .phoneNumber(user.getPhoneNumber())
+                .role(user.getRole())
+                .build();
+    }
+
+    public UserVerifyOtpResponseDto generateNewRefreshToken(UserRefreshTokenRequestDto request) {
+        String token = request.getRefreshToken();
+        Claims claims = jwtUtils.validateRefreshToken(token);
+        Long userId = Long.parseLong(claims.getSubject());
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        if (!token.equals(user.getRefreshToken())) {
+            throw new InvalidTokenException("Invalid refresh token");
+        }
+
+        String newAccessToken = jwtUtils.generateAccessToken(user);
+        return UserVerifyOtpResponseDto.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(token)
+                .name(user.getName())
+                .userId(user.getId().toString())
+                .email(user.getEmail())
+                .phoneNumber(user.getPhoneNumber())
+                .role(user.getRole())
+                .build();
+    }
+
+    @Override
+    public List<UserDto> getAllUsers() {
+        List<User> users = userRepository.findAll();
+
+        return users.stream().map(UserDto::new).toList();
+    }
+
+    @Override
+    public UserDto getUserById(Long id) {
+        return userRepository.findById(id)
+                .map(UserDto::new)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+    }
+
+    @Override
+    public UserDto deleteUserById(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        userRepository.delete(user);
+
+        return new UserDto(user);
     }
 
     @Override

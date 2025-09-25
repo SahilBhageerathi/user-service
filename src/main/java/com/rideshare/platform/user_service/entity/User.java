@@ -27,5 +27,8 @@ public class User {
 
     private boolean approved; // Only for drivers
 
+    @Column(length = 512)
+    private String refreshToken;
+
     //TODO Add location field later if needed
 }
