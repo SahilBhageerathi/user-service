@@ -85,6 +85,7 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    @Override
     public UserOtpResponseDto generateOTP(UserOtpRequestDto request) {
         User existingUser = userRepository.findByPhoneNumber(request.getPhoneNumber())
                 .orElseThrow(() -> new UserNotFoundException("User not found with phone: " + request.getPhoneNumber()));
